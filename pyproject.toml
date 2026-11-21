@@ -1,0 +1,17 @@
+[project]
+name = "partages-cu2-decoder"
+version = "0.1.0"
+description = "PARTAGES CU2: LLM agent for French ICD-10 (PMSI) coding of hospital stays"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "vllm>=0.10.1",
+    "rank-bm25>=0.2.2",
+    "pandas>=2.2",
+    "pyarrow>=16",
+    "huggingface-hub>=0.30",
+]
+
+[tool.ruff]
+line-length = 120
