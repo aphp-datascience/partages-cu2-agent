@@ -19,8 +19,6 @@ The model is released on the Hugging Face Hub:
   disease (e.g. `Z51.1` chemotherapy session, `Z09.0` follow-up after surgery).
 - **DR** (*diagnostic relié*): when the DP is a Z code, the disease behind it (e.g. the cancer
   treated during a chemotherapy session).
-- **Target code**: the disease of the stay, i.e. the DR if there is one, otherwise the DP (also
-  returned; the results below are measured on the DP).
 - **CRC / CRH / CR-OP**: consultation reports, discharge summaries, operative reports.
 
 **In short**

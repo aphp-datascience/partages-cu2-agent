@@ -31,8 +31,6 @@ departments, DIM), next to the encoder
   disease (e.g. `Z51.1` chemotherapy session, `Z09.0` follow-up after surgery).
 - **DR** (*diagnostic relié*): when the DP is a Z code, the disease behind it (e.g. the cancer
   treated during a chemotherapy session).
-- **Target code**: the disease of the stay, i.e. the DR if there is one, otherwise the DP (also
-  returned; the results below are measured on the DP).
 
 **In short**
 
@@ -62,7 +60,7 @@ uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --resources r
 Input: the CSV of the PARTAGES guidelines, one row per stay: `id`, `speciality`, `text` (the
 consultation, operative and discharge reports concatenated), `procedure` (the CCAM codes,
 separated by spaces) and, for evaluation, `primary_diag` (the PMSI DP). Output per stay: the
-suggested DP (`primary_diag_pred`), `dr`, `target` and the model's `justification`.
+suggested DP (`primary_diag_pred`), the DR (`dr`) and the model's `justification`.
 
 ## Model and training
 
