@@ -56,12 +56,13 @@ git clone https://github.com/aphp-datascience/partages-cu2-decoder.git && cd par
 uv run huggingface-cli download PARTAGES-CU2/cu2-icd10-dp-agent --local-dir models/cu2-icd10-dp-agent
 uv run huggingface-cli download PARTAGES-CU2/cu2-agent-resources --repo-type dataset --local-dir resources/data
 uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --resources resources/data \
-    --data my_stays.parquet --out preds.parquet --acts acts
+    --data my_stays.csv --out preds.csv
 ```
 
-Input: one row per stay with `note_id`, `note_text` (consultation, operative and discharge reports
-in chronological order) and, if available, the CCAM codes of the stay (`acts`). Output: `dp`,
-`dr`, `target`, `justification` per stay.
+Input: the CSV of the PARTAGES guidelines, one row per stay: `id`, `speciality`, `text` (the
+consultation, operative and discharge reports concatenated), `procedure` (the CCAM codes,
+separated by spaces) and, for evaluation, `primary_diag` (the PMSI DP). Output per stay: the
+suggested DP (`primary_diag_pred`), `dr`, `target` and the model's `justification`.
 
 ## Model and training
 

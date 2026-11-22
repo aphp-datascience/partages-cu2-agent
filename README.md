@@ -59,15 +59,16 @@ On a server without internet access, download on another machine and copy both f
 
 ## 2. Input data
 
-The same file as for the encoder: one parquet file, **one row per hospital stay (RUM)**.
+The same file as for the encoder: one **CSV file, one row per hospital stay (RUM)**, with the
+columns of the PARTAGES guidelines (the format of the PARTAGES Codabench challenge):
 
-| Column | Needed for | Content |
-|---|---|---|
-| `note_id` | always | a unique id of the stay |
-| `note_text` | always | the CRC, CR-OP and CRH of the stay, in chronological order, separated by a blank line |
-| `acts` | strongly recommended | the CCAM codes of the stay, e.g. `NFFC004;ZBQK002` (empty if none) |
-| `dp` | evaluation | the PMSI principal diagnosis (`C509` or `C50.9`) |
-| `dr` | evaluation | the PMSI related diagnosis (empty when none) |
+| Column | Needed for | Content | Example |
+|---|---|---|---|
+| `id` | always | a unique id of the stay | `RUM_000123` |
+| `speciality` | — | the specialty of the stay (not used by the model) | `CHIRURGIE VISCERALE` |
+| `text` | always | the reports of the stay (CRC, CR-OP, CRH) concatenated, separated by a blank line or by the `[...]` marker of the guidelines | `Compte rendu de consultation …` |
+| `procedure` | strongly recommended | the CCAM codes of the stay, separated by spaces; empty if none | `NDPA014 NDPA008` |
+| `primary_diag` | evaluation | the PMSI principal diagnosis (DP) of the RUM, as coded, Z codes included | `M6534`, `Z511` |
 
 Records longer than 60 000 characters are cut (the start is kept). For evaluation, build the test
 set as carefully as for the encoder: stays reviewed by the DIM, ideally coded twice (see the
@@ -77,28 +78,32 @@ set as carefully as for the encoder: stays reviewed by the DIM, ideally coded tw
 
 ```bash
 uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --resources resources/data \
-    --data my_test.parquet --out preds.parquet --acts acts --gold-dp dp --gold-dr dr
+    --data my_test.csv --out preds.csv
 ```
 
 | Option | What it does |
 |---|---|
 | `--model`, `--resources` | the downloaded model and resources folders |
-| `--data`, `--out` | your parquet file, and the file where predictions are written |
-| `--acts acts` | name of the column holding the CCAM codes: the script writes the `Actes (CCAM) : …` line at the top of each text, as in training. Leave it out if you have no acts |
-| `--gold-dp dp`, `--gold-dr dr` | names of the columns holding **your** PMSI coding. Optional: only used to print the accuracy at the end |
+| `--data`, `--out` | your stays file, and the file where predictions are written (CSV, or parquet if the name ends with `.parquet`) |
+| `--no-acts` | do not write the CCAM line (by default it is built from `procedure`, as in training) |
 | `--keep-conv` | also write the whole conversation (searches, tool results, answer) of each stay |
 | `--procedure` | coding procedure of the system prompt; by default the `procedure.md` shipped with the model, i.e. the one it was trained with (keep it) |
 | `--gpus` | number of GPUs (tensor parallelism) |
 
-`preds.parquet` has one row per stay:
+`preds.csv` has one row per stay:
 
 | Column | Meaning |
 |---|---|
-| `dp`, `dr` | the suggested PMSI coding (DR only when the DP is a Z code) |
-| `target` | the target code, to compare with your coding: the DR if any, else the DP |
+| `id` | the id of the stay |
+| `primary_diag_pred` | the suggested DP, to compare with your `primary_diag` |
+| `dr` | the suggested DR (only when the DP is a Z code) |
+| `target` | the disease of the stay: the DR if any, else the DP |
 | `justification` | the model's explanation of its choice |
 | `n_tools`, `forced_answer` | number of tool calls; whether the answer had to be requested (turn limit or very long record) |
 | `conversation` | with `--keep-conv`: the whole conversation, JSON |
+
+If the file has a `primary_diag` column, the script prints the share of stays where the suggested
+DP equals it: exact code, first 4 characters (the Codabench metric) and first 3 characters.
 
 ## 4. Adapting the agent to your hospital
 
@@ -147,6 +152,7 @@ reviewed coding, never seen in training): 67.4 % exact on the target code (one r
 decoder/agent.py       the agent: prompts, conversation loop, answer checks
 decoder/tools.py       the four offline tools
 decoder/acts.py        CCAM procedure line of the input text
+decoder/stays.py       reading the stays file (CSV of the guidelines)
 scripts/predict.py     inference (and accuracy) on a file
 resources/procedure.md coding procedure used when the model ships none (part of the system prompt)
 data/dr_rule.json      keep-the-DR rule per Z code
