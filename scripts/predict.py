@@ -42,8 +42,9 @@ def main() -> None:
     ap.add_argument("--max-turns", type=int, default=12)
     ap.add_argument("--max-model-len", type=int, default=32768)
     ap.add_argument("--gpus", type=int, default=1, help="tensor parallel GPUs")
-    ap.add_argument("--procedure", type=Path, default=ROOT / "resources/procedure.md",
-                    help="coding procedure of the system prompt (keep the one the model was trained with)")
+    ap.add_argument("--procedure", type=Path,
+                    help="coding procedure of the system prompt; default: procedure.md shipped with the model (the "
+                         "one it was trained with), else resources/procedure.md")
     ap.add_argument("--keep-conv", action="store_true", help="also write the whole conversation")
     a = ap.parse_args()
 
@@ -56,15 +57,23 @@ def main() -> None:
     texts = [t[: a.max_chars] for t in texts]
     print(f"{len(texts)} stays ; {long} cut to {a.max_chars} characters", flush=True)
 
+    model = Path(a.model)
+    if not model.is_dir():  # Hugging Face repo id ("org/name" or "org/name@revision")
+        from huggingface_hub import snapshot_download
+
+        repo, _, rev = a.model.partition("@")
+        model = Path(snapshot_download(repo, revision=rev or None))
+    procedure = a.procedure or (model / "procedure.md" if (model / "procedure.md").exists() else ROOT / "resources/procedure.md")
+    print(f"model {model} ; procedure {procedure}", flush=True)
     R = Ressources(a.resources / "index", a.resources / "syn_all.parquet")
     from vllm import LLM
 
     # cascade attention off: with small batches sharing the long system prompt, vLLM 0.10 produced degenerate
     # outputs (repetitions, no answer for ~60 % of 30 stays; 0 % without it)
-    llm = LLM(model=a.model, max_model_len=a.max_model_len, gpu_memory_utilization=0.9,
+    llm = LLM(model=str(model), max_model_len=a.max_model_len, gpu_memory_utilization=0.9,
               tensor_parallel_size=a.gpus, enable_prefix_caching=True, seed=0, disable_cascade_attn=True)
     t0 = time.time()
-    res = run(llm, texts, R, Settings(max_turns=a.max_turns, max_model_len=a.max_model_len, procedure=a.procedure))
+    res = run(llm, texts, R, Settings(max_turns=a.max_turns, max_model_len=a.max_model_len, procedure=procedure))
     rule = None if str(a.rule) == "none" else json.loads(a.rule.read_text())
     out = pd.DataFrame({
         "note_id": df["note_id"].to_numpy(),

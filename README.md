@@ -10,7 +10,7 @@ departments, DIM), next to the
 [encoder](https://github.com/aphp-datascience/partages-cu2-encoder), a lighter classifier.
 The model is released on the Hugging Face Hub:
 **[`PARTAGES-CU2/cu2-icd10-dp-agent`](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-agent)**
-(TODO: publication once the final version is chosen).
+(current version `v0`, a pre-release to test the agent; a final version will follow).
 
 **Terms used below**
 
@@ -31,7 +31,8 @@ The model is released on the Hugging Face Hub:
 - **Encoder or agent?** The [encoder](https://github.com/aphp-datascience/partages-cu2-encoder)
   is faster and gives a ranked list of candidates; the agent is slower (several tool calls per
   stay) but explains its choice. TODO: compare their accuracy on AP-HP stays.
-- **Hardware:** one GPU with ≥ 24 GB of memory (TODO: confirm; tested on A100 80 GB).
+- **Hardware:** one GPU with ≥ 40 GB of memory recommended (A100, H100, L40S; tested on an A100
+  80 GB): the weights take 16 GB and a long stay needs a 32 000-token context.
 
 ## 1. Installation
 
@@ -86,6 +87,7 @@ uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --resources r
 | `--acts acts` | name of the column holding the CCAM codes: the script writes the `Actes (CCAM) : …` line at the top of each text, as in training. Leave it out if you have no acts |
 | `--gold-dp dp`, `--gold-dr dr` | names of the columns holding **your** PMSI coding. Optional: only used to print the accuracy at the end |
 | `--keep-conv` | also write the whole conversation (searches, tool results, answer) of each stay |
+| `--procedure` | coding procedure of the system prompt; by default the `procedure.md` shipped with the model, i.e. the one it was trained with (keep it) |
 | `--gpus` | number of GPUs (tensor parallelism) |
 
 `preds.parquet` has one row per stay:
@@ -106,14 +108,13 @@ fine-tuned on them (LoRA), without any larger model.
 
 ## Model and training
 
-TODO: final version (E / F) and figures.
-
 - **Base model:** [`Qwen/Qwen3-8B`](https://huggingface.co/Qwen/Qwen3-8B) (Apache-2.0), fine-tuned
   with LoRA (rank 32) on agent conversations, the adapter being merged into the weights.
-- **Training conversations:** tool-using conversations of a larger model, **Mistral Large 4**,
-  coding synthetic and fictitious stays (no real patient data) with the same tools and procedure:
-  MISTRAL synthetic surgical stays, PARHAF fictitious patients and their rewrites. Only
-  conversations ending on an accepted code were kept. TODO: volumes, Claude Opus conversations.
+- **Training conversations** (version `v0`): about 15 000 tool-using conversations of a larger
+  model, **Mistral Large 4**, coding stays with the same tools and procedure, no real patient data:
+  4 903 on [PARHAF](https://huggingface.co/datasets/HealthDataHub/PARHAF) fictitious patients and
+  their rewrites (kept when Mistral agrees with a second model), 10 428 on MISTRAL synthetic
+  surgical stays. See the [model card](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-agent).
 - **Tools** (offline, BM25 search; no vector database): `chercher_cim10` (ICD-10 search over
   labels, inclusion notes and synonyms), `fiche_code` (code sheet: PMSI status, inclusions,
   exclusions), `comparer_codes` (all codes of a category side by side), `guide_mco` (passages of
@@ -124,9 +125,12 @@ TODO: final version (E / F) and figures.
   DR, or if the final code was not checked with `fiche_code`. At most 12 tool turns, then the
   answer is requested.
 
-## Results
+## Results (before any fine-tuning on real hospital data)
 
-TODO: AP-HP reviewed stays and test set (before any fine-tuning on real hospital data).
+TODO: physician-reviewed AP-HP stays.
+
+Provisional, on fictitious patients: PARHAF CU2 test patients (288 patients written by physicians,
+reviewed coding, never seen in training): 67.4 % exact on the target code (one run).
 
 ## Limitations
 
@@ -144,7 +148,7 @@ decoder/agent.py       the agent: prompts, conversation loop, answer checks
 decoder/tools.py       the four offline tools
 decoder/acts.py        CCAM procedure line of the input text
 scripts/predict.py     inference (and accuracy) on a file
-resources/procedure.md mandatory coding procedure (part of the system prompt)
+resources/procedure.md coding procedure used when the model ships none (part of the system prompt)
 data/dr_rule.json      keep-the-DR rule per Z code
 data/ccam_2026.csv     CCAM 2026 nomenclature (ATIH)
 ```

@@ -41,7 +41,10 @@ departments, DIM), next to the encoder
   leaves your infrastructure. Trained without any real patient data.
 - **Needs its harness:** the model only works with the tools, prompts and answer checks of the
   repository below (it was trained with them).
-- **Hardware:** one GPU with ≥ 24 GB of memory (TODO: confirm).
+- **Hardware:** one GPU with ≥ 40 GB of memory recommended (A100, H100, L40S; tested on an A100
+  80 GB): the weights take 16 GB and a long stay needs a 32 000-token context.
+- **Version `v0`** (pre-release): a first fine-tuned model, to test the agent on your stays; a final
+  version will follow.
 
 **Everything to run and evaluate it on your stays:**
 <https://github.com/aphp-datascience/partages-cu2-decoder>.
@@ -62,19 +65,29 @@ in chronological order) and, if available, the CCAM codes of the stay (`acts`). 
 
 ## Model and training
 
-TODO: final version and figures.
+- **Base model:** `Qwen/Qwen3-8B` (Apache-2.0); LoRA fine-tuning (rank 32, all projections, one
+  epoch, learning rate 1e-4), adapter merged into the weights (bf16).
+- **Training data:** about 15 000 tool-using conversations of **Mistral Large 4** coding stays with
+  the same tools and procedure, no real patient data:
 
-- **Base model:** `Qwen/Qwen3-8B` (Apache-2.0); LoRA fine-tuning (rank 32), adapter merged into
-  the weights (bf16).
-- **Training data:** tool-using conversations of **Mistral Large 4** (and TODO: Claude Opus) coding
-  synthetic surgical stays (MISTRAL) and fictitious patients (PARHAF, CC BY 4.0) with the same tools
-  and procedure; only conversations ending on an accepted code were kept. No real patient data.
+  | Stays coded | Conversations | Kept |
+  |---|---:|---|
+  | [PARHAF](https://huggingface.co/datasets/HealthDataHub/PARHAF) (CC BY 4.0) fictitious patients and their rewrites | 4 903 | when Mistral Large 4 agrees with a second model (Qwen 27B) |
+  | MISTRAL synthetic surgical stays | 10 428 | all (Mistral Large 4's coding replaces the noisy original code) |
+
+  One training example is one assistant turn of a conversation (tool call or final answer).
+- **Prompt:** the system prompt includes the coding procedure the model was trained with,
+  `procedure.md` in this repository; the inference script of the repository reads it from here.
 - **Tools:** ICD-10 search (labels, inclusion notes, synonyms; BM25), code sheet (PMSI status,
   inclusions, exclusions), comparison of the codes of a category, search in the ATIH MCO guide 2026.
 
 ## Results (before any fine-tuning on real hospital data)
 
 TODO: physician-reviewed AP-HP stays.
+
+Provisional, on fictitious patients (no real patient data): PARHAF CU2 test patients (288 patients
+written by physicians, reviewed coding, never seen in training): 67.4 % exact on the target code
+(one run; 71.2 % with a majority vote over 5 runs).
 
 ## Limitations
 
