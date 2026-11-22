@@ -31,7 +31,8 @@ departments, DIM), next to the encoder
   disease (e.g. `Z51.1` chemotherapy session, `Z09.0` follow-up after surgery).
 - **DR** (*diagnostic relié*): when the DP is a Z code, the disease behind it (e.g. the cancer
   treated during a chemotherapy session).
-- **Target code**: the disease of the stay, i.e. the DR if there is one, otherwise the DP.
+- **Target code**: the disease of the stay, i.e. the DR if there is one, otherwise the DP (also
+  returned; the results below are measured on the DP).
 
 **In short**
 
@@ -84,22 +85,29 @@ suggested DP (`primary_diag_pred`), `dr`, `target` and the model's `justificatio
 
 ## Results (before any fine-tuning on real hospital data)
 
+Accuracy of the suggested **DP** against the PMSI DP of the stay, i.e. what `primary_diag`
+contains: exact code, first 4 characters (the metric of the PARTAGES Codabench challenge), and
+3-character category.
+
 **Physician-reviewed AP-HP stays** (May 2026; text = acts + CRC + CRH + CR-OP), the same stays as for
 the [encoder](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-encoder). Views: **flattened** =
 every review is a row; **agreement + single** = one row per stay, reviewed once or by several
-reviewers who agree; **agreement** = only stays with several agreeing reviewers. Accuracy on the
-disease of the stay (the DR if any, else the DP), whole ICD-10:
+reviewers who agree; **agreement** = only stays with several agreeing reviewers. **ICD-10** = all
+stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 codes).
 
-| View | Stays | Exact | 4 char. | 3 char. |
-|---|---:|---:|---:|---:|
-| flattened | 310 | 46.8 % | 48.7 % | 61.0 % |
-| agreement + single | 195 | 47.2 % | 49.7 % | 62.1 % |
-| agreement | 47 | 70.2 % | 70.2 % | 74.5 % |
+| View | Scope | Stays | Exact | 4 char. | 3 char. |
+|---|---|---:|---:|---:|---:|
+| flattened | ICD-10 | 301 | 46.8 % | 48.5 % | 59.8 % |
+| flattened | surgery | 253 | 51.8 % | 53.4 % | 64.0 % |
+| agreement + single | ICD-10 | 190 | 50.0 % | 52.1 % | 63.2 % |
+| agreement + single | surgery | 163 | 54.0 % | 55.8 % | 66.3 % |
+| agreement | ICD-10 | 47 | 59.6 % | 59.6 % | 66.0 % |
+| agreement | surgery | 42 | 64.3 % | 64.3 % | 66.7 % |
 
-**Principal diagnosis as coded (DP)**, what the repository's script compares with `primary_diag`
-(flattened): 46.8 % exact, 48.5 % 4 char., 59.8 % 3 char.; 46.6 % when the DP is not a Z code and
-47 % when it is a Z code (sessions, follow-up), where the agent is much better than the encoder
-(about 25 %). Small sets: 95 % confidence interval about ±7 points on ~200 stays, ±13 points on ~50.
+The agent is better than the encoder on these stays (flattened: 46.8 % vs 39.0 % exact), mostly
+when the DP is a Z code (sessions, follow-up…): 47 % vs 24 % exact. Small sets: 95 % confidence
+interval about ±7 points on ~200 stays, ±13 points on ~50; the reference coding is not certain
+either. A few stays (about 3 %) get no answer within the limits of the agent and are not counted.
 
 ## Limitations
 

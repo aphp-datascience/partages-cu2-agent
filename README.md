@@ -10,7 +10,7 @@ departments, DIM), next to the
 [encoder](https://github.com/aphp-datascience/partages-cu2-encoder), a lighter classifier.
 The model is released on the Hugging Face Hub:
 **[`PARTAGES-CU2/cu2-icd10-dp-agent`](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-agent)**
-(current version `v0`, a pre-release to test the agent; a final version will follow).
+(current version `v0.1`, a pre-release to test the agent; a final version will follow).
 
 **Terms used below**
 
@@ -19,7 +19,8 @@ The model is released on the Hugging Face Hub:
   disease (e.g. `Z51.1` chemotherapy session, `Z09.0` follow-up after surgery).
 - **DR** (*diagnostic relié*): when the DP is a Z code, the disease behind it (e.g. the cancer
   treated during a chemotherapy session).
-- **Target code**: the disease of the stay, i.e. the DR if there is one, otherwise the DP.
+- **Target code**: the disease of the stay, i.e. the DR if there is one, otherwise the DP (also
+  returned; the results below are measured on the DP).
 - **CRC / CRH / CR-OP**: consultation reports, discharge summaries, operative reports.
 
 **In short**
@@ -30,7 +31,9 @@ The model is released on the Hugging Face Hub:
   text leaves your infrastructure. The model was trained without any real patient data.
 - **Encoder or agent?** The [encoder](https://github.com/aphp-datascience/partages-cu2-encoder)
   is faster and gives a ranked list of candidates; the agent is slower (several tool calls per
-  stay) but explains its choice. TODO: compare their accuracy on AP-HP stays.
+  stay) but explains its choice. On physician-reviewed AP-HP stays the agent finds the exact DP
+  more often (46.8 % vs 39.0 %), mostly for Z codes (sessions, follow-up); the encoder's top-20
+  contains the DP in 71 % of the stays, and only the encoder can be fine-tuned on your stays.
 - **Hardware:** one GPU with ≥ 40 GB of memory recommended (A100, H100, L40S; tested on an A100
   80 GB): the weights take 16 GB and a long stay needs a 32 000-token context.
 
@@ -107,19 +110,23 @@ DP equals it: exact code, first 4 characters (the Codabench metric) and first 3 
 
 ## 4. Adapting the agent to your hospital
 
-TODO (after the AP-HP results): self-distillation on your own coded stays. The agent plays each
-training stay several times, the conversations that find your coding are kept, and the model is
-fine-tuned on them (LoRA), without any larger model.
+No adaptation of the agent is provided yet. We tested **self-distillation** on AP-HP coded stays
+(the agent plays each training stay several times, the conversations that find the hospital's
+coding are kept, and the model is fine-tuned on them): it brought no gain (−0.8 points, not
+significant), because the model only learns again the stays it already solves. Adapting with
+conversations of a larger model is being studied. To adapt the coding to your hospital today,
+fine-tune the [encoder](https://github.com/aphp-datascience/partages-cu2-encoder#4-fine-tuning-on-your-stays).
 
 ## Model and training
 
 - **Base model:** [`Qwen/Qwen3-8B`](https://huggingface.co/Qwen/Qwen3-8B) (Apache-2.0), fine-tuned
   with LoRA (rank 32) on agent conversations, the adapter being merged into the weights.
-- **Training conversations** (version `v0`): about 15 000 tool-using conversations of a larger
+- **Training conversations** (version `v0.1`): about 27 600 tool-using conversations of a larger
   model, **Mistral Large 4**, coding stays with the same tools and procedure, no real patient data:
-  4 903 on [PARHAF](https://huggingface.co/datasets/HealthDataHub/PARHAF) fictitious patients and
-  their rewrites (kept when Mistral agrees with a second model), 10 428 on MISTRAL synthetic
-  surgical stays. See the [model card](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-agent).
+  6 385 on [PARHAF](https://huggingface.co/datasets/HealthDataHub/PARHAF) fictitious patients and
+  their rewrites, 784 on PARHAF patients with a reference coding (only conversations reaching it),
+  20 428 on MISTRAL synthetic surgical stays. See the
+  [model card](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-agent).
 - **Tools** (offline, BM25 search; no vector database): `chercher_cim10` (ICD-10 search over
   labels, inclusion notes and synonyms), `fiche_code` (code sheet: PMSI status, inclusions,
   exclusions), `comparer_codes` (all codes of a category side by side), `guide_mco` (passages of
@@ -132,10 +139,29 @@ fine-tuned on them (LoRA), without any larger model.
 
 ## Results (before any fine-tuning on real hospital data)
 
-TODO: physician-reviewed AP-HP stays.
+Accuracy of the suggested **DP** against the PMSI DP of the stay, i.e. what `primary_diag`
+contains: exact code, first 4 characters (the metric of the PARTAGES Codabench challenge), and
+3-character category.
 
-Provisional, on fictitious patients: PARHAF CU2 test patients (288 patients written by physicians,
-reviewed coding, never seen in training): 67.4 % exact on the target code (one run).
+**Physician-reviewed AP-HP stays** (May 2026; text = acts + CRC + CRH + CR-OP), the same stays as for
+the [encoder](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-encoder). Views: **flattened** =
+every review is a row; **agreement + single** = one row per stay, reviewed once or by several
+reviewers who agree; **agreement** = only stays with several agreeing reviewers. **ICD-10** = all
+stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 codes).
+
+| View | Scope | Stays | Exact | 4 char. | 3 char. |
+|---|---|---:|---:|---:|---:|
+| flattened | ICD-10 | 301 | 46.8 % | 48.5 % | 59.8 % |
+| flattened | surgery | 253 | 51.8 % | 53.4 % | 64.0 % |
+| agreement + single | ICD-10 | 190 | 50.0 % | 52.1 % | 63.2 % |
+| agreement + single | surgery | 163 | 54.0 % | 55.8 % | 66.3 % |
+| agreement | ICD-10 | 47 | 59.6 % | 59.6 % | 66.0 % |
+| agreement | surgery | 42 | 64.3 % | 64.3 % | 66.7 % |
+
+The agent is better than the encoder on these stays (flattened: 46.8 % vs 39.0 % exact), mostly
+when the DP is a Z code (sessions, follow-up…): 47 % vs 24 % exact. Small sets: 95 % confidence
+interval about ±7 points on ~200 stays, ±13 points on ~50; the reference coding is not certain
+either. A few stays (about 3 %) get no answer within the limits of the agent and are not counted.
 
 ## Limitations
 
