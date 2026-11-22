@@ -43,8 +43,7 @@ departments, DIM), next to the encoder
   repository below (it was trained with them).
 - **Hardware:** one GPU with ≥ 40 GB of memory recommended (A100, H100, L40S; tested on an A100
   80 GB): the weights take 16 GB and a long stay needs a 32 000-token context.
-- **Version `v0`** (pre-release): a first fine-tuned model, to test the agent on your stays; a final
-  version will follow.
+- **Version `v0.1`** (pre-release, to test the agent on your stays); `v0` is the previous one.
 
 **Everything to run and evaluate it on your stays:**
 <https://github.com/aphp-datascience/partages-cu2-decoder>.
@@ -68,13 +67,14 @@ suggested DP (`primary_diag_pred`), `dr`, `target` and the model's `justificatio
 
 - **Base model:** `Qwen/Qwen3-8B` (Apache-2.0); LoRA fine-tuning (rank 32, all projections, one
   epoch, learning rate 1e-4), adapter merged into the weights (bf16).
-- **Training data:** about 15 000 tool-using conversations of **Mistral Large 4** coding stays with
+- **Training data:** about 27 600 tool-using conversations of **Mistral Large 4** coding stays with
   the same tools and procedure, no real patient data:
 
   | Stays coded | Conversations | Kept |
   |---|---:|---|
-  | [PARHAF](https://huggingface.co/datasets/HealthDataHub/PARHAF) (CC BY 4.0) fictitious patients and their rewrites | 4 903 | when Mistral Large 4 agrees with a second model (Qwen 27B) |
-  | MISTRAL synthetic surgical stays | 10 428 | all (Mistral Large 4's coding replaces the noisy original code) |
+  | [PARHAF](https://huggingface.co/datasets/HealthDataHub/PARHAF) (CC BY 4.0) fictitious patients and their rewrites | 6 385 | all |
+  | PARHAF patients with a reference coding (Claude Opus, partly reviewed by physicians) | 784 | only conversations reaching the reference code |
+  | MISTRAL synthetic surgical stays | 20 428 | all (Mistral Large 4's coding replaces the noisy original code) |
 
   One training example is one assistant turn of a conversation (tool call or final answer).
 - **Prompt:** the system prompt includes the coding procedure the model was trained with,
@@ -84,11 +84,22 @@ suggested DP (`primary_diag_pred`), `dr`, `target` and the model's `justificatio
 
 ## Results (before any fine-tuning on real hospital data)
 
-TODO: physician-reviewed AP-HP stays.
+**Physician-reviewed AP-HP stays** (May 2026; text = acts + CRC + CRH + CR-OP), the same stays as for
+the [encoder](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-encoder). Views: **flattened** =
+every review is a row; **agreement + single** = one row per stay, reviewed once or by several
+reviewers who agree; **agreement** = only stays with several agreeing reviewers. Accuracy on the
+disease of the stay (the DR if any, else the DP), whole ICD-10:
 
-Provisional, on fictitious patients (no real patient data): PARHAF CU2 test patients (288 patients
-written by physicians, reviewed coding, never seen in training): 67.4 % exact on the target code
-(one run; 71.2 % with a majority vote over 5 runs).
+| View | Stays | Exact | 4 char. | 3 char. |
+|---|---:|---:|---:|---:|
+| flattened | 310 | 46.8 % | 48.7 % | 61.0 % |
+| agreement + single | 195 | 47.2 % | 49.7 % | 62.1 % |
+| agreement | 47 | 70.2 % | 70.2 % | 74.5 % |
+
+**Principal diagnosis as coded (DP)**, what the repository's script compares with `primary_diag`
+(flattened): 46.8 % exact, 48.5 % 4 char., 59.8 % 3 char.; 46.6 % when the DP is not a Z code and
+47 % when it is a Z code (sessions, follow-up), where the agent is much better than the encoder
+(about 25 %). Small sets: 95 % confidence interval about ±7 points on ~200 stays, ±13 points on ~50.
 
 ## Limitations
 
