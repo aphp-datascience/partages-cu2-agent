@@ -41,18 +41,13 @@ departments, DIM), next to the encoder
   leaves your infrastructure. Trained without any real patient data.
 - **Needs its harness:** the model only works with the tools, prompts and answer checks of the
   repository below (it was trained with them).
-- **Hardware:** one GPU with ≥ 24 GB of memory. With ≥ 40 GB (A100, H100, L40S, A6000) the
-  model runs as is (weights 16 GB, contexts up to 32 000 tokens). On a 24 GB GPU (L4, A10,
-  RTX 4090), load it in FP8 (`--quantization fp8`, weights 8.5 GB): tested by limiting an A100 to
-  24 GB, it gave no measurable loss on the reviewed AP-HP stays (DP within ±4.5 points, no more
-  stays without answer) and was about 12 % slower.
+- **Hardware:** one GPU with ≥ 40 GB of memory, or ≥ 24 GB with `--quantization fp8` (no
+  measurable loss on the reviewed AP-HP stays, about 12 % slower).
 - **Speed:** on one A100, about 1 200 stays per hour on 200 synthetic stays of ~550 words, and
   about 420 per hour on 339 real AP-HP stays (longer reports, ~11 tool calls per stay), all
   stays processed together; fewer stays at a time are slower. The encoder processes the same
   synthetic stays about 400 times faster.
 - **Mostly trained on surgical stays**, but covers the whole ICD-10 (see Limitations).
-- **Adapting it to your hospital:** not provided yet (self-distillation on AP-HP stays brought no
-  gain); to adapt the coding to your stays, fine-tune the encoder.
 
 **Everything to run and evaluate it on your stays:**
 <https://github.com/aphp-datascience/partages-cu2-decoder>.
@@ -100,6 +95,8 @@ repository); the *user message* is the record of the stay. At each turn the mode
 tools (1 to 3 per message), whose results are appended to the conversation, or gives its final
 answer as one line of JSON: `{"dp": "Z511", "dr": "C509", "justification": "..."}`.
 
+Tool names, prompts and tool results are in French, as in training.
+
 | Tool (offline, BM25) | Returns | Procedure step |
 |---|---|---|
 | `guide_mco` | the 3 closest passages of the ATIH MCO guide 2026 | which coding rule applies |
@@ -107,9 +104,13 @@ answer as one line of JSON: `{"dp": "Z511", "dr": "C509", "justification": "..."
 | `fiche_code` | label, PMSI status, inclusions, **exclusions**, parent and more precise codes | read the exclusions; check the final code |
 | `comparer_codes` | all the codes of a category side by side | choose the 4th / 5th character |
 
-An answer is refused, and the model asked again, if a code does not exist or is not allowed as DP
-/ DR, if one of the four tools was not called, or if the final code was not read with
-`fiche_code`. After 12 turns, or when the next turn would not fit in the 32 000-token context,
+An answer is refused, and the model asked again, if:
+
+- a code does not exist, or is not allowed as DP / DR;
+- one of the four tools was not called;
+- the final code was not read with `fiche_code`.
+
+After 12 turns, or when the next turn would not fit in the 32 000-token context,
 the answer is requested without tools. Sampling: temperature 0.7, top-p 0.8, top-k 20, presence
 penalty 1.0, Qwen3 thinking mode off; two runs on the same stays do not give exactly the same
 codes.

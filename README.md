@@ -32,19 +32,14 @@ The model is released on the Hugging Face Hub:
   more often (45.5 % vs 41.0 %, same stays), mostly for Z codes (sessions, follow-up); the
   encoder's top-20 contains the DP in 71 % of the stays, and only the encoder can be fine-tuned
   on your stays.
-- **Hardware:** one GPU with ≥ 24 GB of memory. With ≥ 40 GB (A100, H100, L40S, A6000) the
-  model runs as is (weights 16 GB, contexts up to 32 000 tokens). On a 24 GB GPU (L4, A10,
-  RTX 4090), load it in FP8 (`--quantization fp8`, weights 8.5 GB): tested by limiting an A100 to
-  24 GB, it gave no measurable loss on the reviewed AP-HP stays (DP within ±4.5 points, no more
-  stays without answer) and was about 12 % slower.
+- **Hardware:** one GPU with ≥ 40 GB of memory, or ≥ 24 GB with `--quantization fp8` (no
+  measurable loss on the reviewed AP-HP stays, about 12 % slower).
 - **Speed:** on one A100, about 1 200 stays per hour on 200 synthetic stays of ~550 words, and
   about 420 per hour on 339 real AP-HP stays (longer reports, ~11 tool calls per stay), all
   stays processed together; fewer stays at a time are slower. The encoder processes the same
   synthetic stays about 400 times faster.
 - **Mostly trained on surgical stays**, but covers the whole ICD-10 (see
   [Limitations](#limitations)).
-- **Adapting it to your hospital:** not provided yet; fine-tune the encoder (see
-  [section 4](#4-adapting-the-agent-to-your-hospital)).
 
 ## 1. Installation
 
@@ -120,15 +115,6 @@ uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --resources r
 If the file has a `primary_diag` column, the script prints the share of stays where the suggested
 DP equals it: exact code, first 4 characters (the Codabench metric) and first 3 characters.
 
-## 4. Adapting the agent to your hospital
-
-No adaptation of the agent is provided yet. We tested **self-distillation** on AP-HP coded stays
-(the agent plays each training stay several times, the conversations that find the hospital's
-coding are kept, and the model is fine-tuned on them): it brought no gain (−0.8 points, not
-significant), because the model only learns again the stays it already solves. Adapting with
-conversations of a larger model is being studied. To adapt the coding to your hospital today,
-fine-tune the [encoder](https://github.com/aphp-datascience/partages-cu2-encoder#4-fine-tuning-on-your-stays).
-
 ## Model and training
 
 ### How the agent works
@@ -146,7 +132,8 @@ The *user message* is the record of the stay (CCAM line, then the reports) follo
 diagnostic principal ? ». The final answer is one line of JSON:
 `{"dp": "Z511", "dr": "C509", "justification": "..."}` (codes without dot, `dr` null if none).
 
-**The tools** (offline; each takes one text argument and returns French text to the model):
+**The tools** (offline; each takes one text argument and returns text to the model). Tool names,
+prompts and tool results are in French, as in training:
 
 | Tool | Argument | Returns | Procedure step |
 |---|---|---|---|
