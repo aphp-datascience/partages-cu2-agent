@@ -34,6 +34,9 @@ The model is released on the Hugging Face Hub:
   contains the DP in 71 % of the stays, and only the encoder can be fine-tuned on your stays.
 - **Hardware:** one GPU with ≥ 40 GB of memory recommended (A100, H100, L40S; tested on an A100
   80 GB): the weights take 16 GB and a long stay needs a 32 000-token context.
+- **Speed:** on one A100, about 1 200 stays per hour, measured on 200 stays of ~550 words
+  processed together (7-8 tool calls per stay); the throughput is lower with fewer stays at a
+  time. The encoder processes the same stays about 400 times faster.
 
 ## 1. Installation
 
