@@ -105,8 +105,8 @@ stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 c
 | agreement | ICD-10 | 47 | 59.6 % | 59.6 % | 66.0 % |
 | agreement | surgery | 42 | 64.3 % | 64.3 % | 66.7 % |
 
-The agent is better than the encoder on these stays (flattened: 46.8 % vs 39.0 % exact), mostly
-when the DP is a Z code (sessions, follow-up…): 47 % vs 24 % exact. Small sets: 95 % confidence
+The agent is better than the encoder on these stays (flattened: 46.8 % vs 41.0 % exact), mostly
+when the DP is a Z code (sessions, follow-up…): 47 % vs 33 % exact. Small sets: 95 % confidence
 interval about ±7 points on ~200 stays, ±13 points on ~50; the reference coding is not certain
 either. A few stays (about 3 %) get no answer within the limits of the agent and are not counted.
 

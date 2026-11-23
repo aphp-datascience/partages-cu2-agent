@@ -30,7 +30,7 @@ The model is released on the Hugging Face Hub:
 - **Encoder or agent?** The [encoder](https://github.com/aphp-datascience/partages-cu2-encoder)
   is faster and gives a ranked list of candidates; the agent is slower (several tool calls per
   stay) but explains its choice. On physician-reviewed AP-HP stays the agent finds the exact DP
-  more often (46.8 % vs 39.0 %), mostly for Z codes (sessions, follow-up); the encoder's top-20
+  more often (46.8 % vs 41.0 %), mostly for Z codes (sessions, follow-up); the encoder's top-20
   contains the DP in 71 % of the stays, and only the encoder can be fine-tuned on your stays.
 - **Hardware:** one GPU with ≥ 40 GB of memory recommended (A100, H100, L40S; tested on an A100
   80 GB): the weights take 16 GB and a long stay needs a 32 000-token context.
@@ -159,8 +159,8 @@ stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 c
 | agreement | ICD-10 | 47 | 59.6 % | 59.6 % | 66.0 % |
 | agreement | surgery | 42 | 64.3 % | 64.3 % | 66.7 % |
 
-The agent is better than the encoder on these stays (flattened: 46.8 % vs 39.0 % exact), mostly
-when the DP is a Z code (sessions, follow-up…): 47 % vs 24 % exact. Small sets: 95 % confidence
+The agent is better than the encoder on these stays (flattened: 46.8 % vs 41.0 % exact), mostly
+when the DP is a Z code (sessions, follow-up…): 47 % vs 33 % exact. Small sets: 95 % confidence
 interval about ±7 points on ~200 stays, ±13 points on ~50; the reference coding is not certain
 either. A few stays (about 3 %) get no answer within the limits of the agent and are not counted.
 
