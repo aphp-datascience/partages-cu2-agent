@@ -34,7 +34,9 @@ departments, DIM). The model is released on the Hugging Face Hub:
 
 ## 1. Installation
 
-Python 3.12 and [uv](https://docs.astral.sh/uv/); an NVIDIA GPU with a recent driver (vLLM).
+Python 3.12 and [uv](https://docs.astral.sh/uv/); Linux x86_64 with an NVIDIA GPU and a driver ≥ 580 (CUDA 13).
+`uv sync` installs the exact versions of the tested environment (`uv.lock`: vLLM 0.32.0, torch 2.13.0,
+transformers 5.19.0).
 
 ```bash
 git clone https://github.com/aphp-datascience/partages-cu2-decoder.git
