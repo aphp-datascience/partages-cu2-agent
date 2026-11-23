@@ -6,9 +6,7 @@ hospital activity database): its **principal diagnosis (DP)** and, when the DP i
 fine-tuned 8-billion-parameter model (Qwen3-8B) reads the record, searches the ICD-10 and the ATIH
 MCO methodological guide with offline tools, follows a mandatory coding procedure, and answers.
 It was developed in the PARTAGES project (use case 2, coding assistance for medical information
-departments, DIM), next to the
-[encoder](https://github.com/aphp-datascience/partages-cu2-encoder), a lighter classifier.
-The model is released on the Hugging Face Hub:
+departments, DIM). The model is released on the Hugging Face Hub:
 **[`PARTAGES-CU2/cu2-icd10-dp-agent`](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-agent)**.
 
 **Terms used below**
@@ -26,18 +24,11 @@ The model is released on the Hugging Face Hub:
   searches made). **Not for:** automatic coding without validation; no associated diagnoses (DAS).
 - **Runs locally:** the model and the tools run on your machines (vLLM, offline indexes); no
   text leaves your infrastructure. The model was trained without any real patient data.
-- **Encoder or agent?** The [encoder](https://github.com/aphp-datascience/partages-cu2-encoder)
-  is faster and gives a ranked list of candidates; the agent is slower (several tool calls per
-  stay) but explains its choice. On physician-reviewed AP-HP stays the agent finds the exact DP
-  more often (45.5 % vs 41.0 %, same stays), mostly for Z codes (sessions, follow-up); the
-  encoder's top-20 contains the DP in 71 % of the stays, and only the encoder can be fine-tuned
-  on your stays.
 - **Hardware:** one GPU with ≥ 40 GB of memory, or ≥ 24 GB with `--quantization fp8` (no
   measurable loss on the reviewed AP-HP stays, about 12 % slower).
 - **Speed:** on one A100, about 1 200 stays per hour on 200 synthetic stays of ~550 words, and
   about 420 per hour on 339 real AP-HP stays (longer reports, ~11 tool calls per stay), all
-  stays processed together; fewer stays at a time are slower. The encoder processes the same
-  synthetic stays about 400 times faster.
+  stays processed together; fewer stays at a time are slower.
 - **Mostly trained on surgical stays**, but covers the whole ICD-10 (see
   [Limitations](#limitations)).
 
@@ -66,7 +57,7 @@ On a server without internet access, download on another machine and copy both f
 
 ## 2. Input data
 
-The same file as for the encoder: one **CSV file, one row per hospital stay (RUM)**, with the
+One **CSV file, one row per hospital stay (RUM)**, with the
 columns of the PARTAGES guidelines (the format of the PARTAGES Codabench challenge):
 
 | Column | Needed for | Content | Example |
@@ -77,9 +68,10 @@ columns of the PARTAGES guidelines (the format of the PARTAGES Codabench challen
 | `procedure` | strongly recommended | the CCAM codes of the stay, separated by spaces; empty if none | `NDPA014 NDPA008` |
 | `primary_diag` | evaluation | the PMSI principal diagnosis (DP) of the RUM, as coded, Z codes included | `M6534`, `Z511` |
 
-Records longer than 60 000 characters are cut (the start is kept). For evaluation, build the test
-set as carefully as for the encoder: stays reviewed by the DIM, ideally coded twice (see the
-[encoder README](https://github.com/aphp-datascience/partages-cu2-encoder#2-input-data)).
+Records longer than 60 000 characters are cut (the start is kept). **Make the test set as clean as
+possible:** a noisy test set scores the model against coding errors. If you can, use stays reviewed
+by the DIM, ideally coded twice independently, and keep only the stays where both codings agree. A
+raw accuracy must not be read as a ranking of hospitals, whose coding practices differ.
 
 ## 3. Running and evaluating the agent
 
@@ -194,8 +186,8 @@ No real patient data was used for training. The model learns from about 27 600 c
 
 **Why the conversations of a larger model?** Prompted with the same tools and procedure, the base
 Qwen3-8B does not follow the PMSI coding well (it rarely codes a Z code as DP with its DR); it
-learns it from the conversations of a larger model, Mistral Large 4, which also recoded the
-training stays of the encoder. Only fictitious or synthetic texts were sent to the API.
+learns it from the conversations of a larger model, Mistral Large 4. Only fictitious or synthetic
+texts were sent to the API.
 
 ### Training parameters
 
@@ -211,8 +203,7 @@ Accuracy of the suggested **DP** against the PMSI DP of the stay, i.e. what `pri
 contains: exact code, first 4 characters (the metric of the PARTAGES Codabench challenge), and
 3-character category.
 
-**Physician-reviewed AP-HP stays** (May 2026; text = acts + CRC + CRH + CR-OP), the same stays as for
-the [encoder](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-encoder). Views: **flattened** =
+**Physician-reviewed AP-HP stays** (May 2026; text = acts + CRC + CRH + CR-OP). Views: **flattened** =
 every review is a row; **agreement + single** = one row per stay, reviewed once or by several
 reviewers who agree; **agreement** = only stays with several agreeing reviewers. **ICD-10** = all
 stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 codes).
@@ -227,9 +218,8 @@ stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 c
 | agreement | surgery | 42 | 64.3 % | 64.3 % | 66.7 % |
 
 A stay without answer within the limits of the agent (9 of the 310 flattened stays) counts as an
-error. On the same stays, the agent finds the exact DP more often than the encoder (45.5 % vs
-41.0 %, flattened), mostly when the DP is a Z code (sessions, follow-up…): 44.7 % vs 32.9 % (76
-stays). Small sets: 95 % confidence
+error. When the DP is a Z code (sessions, follow-up…), the agent finds it about as often as other
+DPs: 44.7 % exact (76 stays, flattened). Small sets: 95 % confidence
 interval about ±7 points on ~200 stays, ±13 points on ~50; the reference coding is not certain
 either.
 
@@ -239,8 +229,8 @@ either.
   almost all surgical, and most PARHAF patients are surgical too. The model is clearly more
   accurate on surgical codes (compare the **surgery** rows above).
 - Coding **assistance** only; the justification must be read critically.
-- Slower than the encoder: several tool calls per stay; about 3 % of the stays get no answer
-  (mostly very long records that fill the context).
+- Slow: about ten tool calls per stay. About 3 % of the stays get no answer (mostly very long
+  records that fill the context).
 - One DP (and DR) per stay; no associated diagnoses.
 - Trained on synthetic or fictitious notes: expect a domain shift on real hospital notes.
 - **Reference codes are not certain.** The codes used for training and evaluation are not 100 %
