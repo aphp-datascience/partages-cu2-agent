@@ -93,6 +93,9 @@ uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --resources r
 | `--keep-conv` | also write the whole conversation (searches, tool results, answer) of each stay |
 | `--procedure` | coding procedure of the system prompt; by default the `procedure.md` shipped with the model, i.e. the one it was trained with (keep it) |
 | `--gpus` | number of GPUs (tensor parallelism) |
+| `--max-turns` | tool turns before the answer is requested (default 12, as in training) |
+| `--max-model-len` | context length in tokens (default 32 768) |
+| `--max-chars` | characters of the record kept, from the start (default 60 000) |
 
 `preds.csv` has one row per stay:
 
@@ -101,7 +104,6 @@ uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --resources r
 | `id` | the id of the stay |
 | `primary_diag_pred` | the suggested DP, to compare with your `primary_diag` |
 | `dr` | the suggested DR (only when the DP is a Z code) |
-| `target` | the disease of the stay: the DR if any, else the DP |
 | `justification` | the model's explanation of its choice |
 | `n_tools`, `forced_answer` | number of tool calls; whether the answer had to be requested (turn limit or very long record) |
 | `conversation` | with `--keep-conv`: the whole conversation, JSON |
@@ -117,6 +119,69 @@ coding are kept, and the model is fine-tuned on them): it brought no gain (−0.
 significant), because the model only learns again the stays it already solves. Adapting with
 conversations of a larger model is being studied. To adapt the coding to your hospital today,
 fine-tune the [encoder](https://github.com/aphp-datascience/partages-cu2-encoder#4-fine-tuning-on-your-stays).
+
+## How the agent works
+
+The agent is a conversation between the model and a fixed harness (`decoder/agent.py`). The model was
+trained on conversations produced by exactly this harness, so **keep the prompts, the procedure and the
+checks as they are**: change them only if you fine-tune the model again.
+
+**The prompt.** The *system prompt* asks the model to code the stay as a DIM physician would, following
+the ATIH MCO guide. It defines the DP (a disease, a symptom, or a Z code of care: sessions, negative
+follow-up Z08/Z09, device care Z43-Z47, palliative care…) and the DR (only when the DP is a Z code: the
+disease behind that care), lists the tools, and ends with the mandatory coding procedure
+[`resources/procedure.md`](resources/procedure.md) (the copy shipped with the model is used if present).
+The *user message* is the record of the stay (CCAM line, then the reports) followed by « Quel est le
+diagnostic principal ? ». The final answer is one line of JSON:
+`{"dp": "Z511", "dr": "C509", "justification": "..."}` (codes without dot, `dr` null if none).
+
+**The tools** (offline; each takes one text argument and returns French text to the model):
+
+| Tool | Argument | Returns | Procedure step |
+|---|---|---|---|
+| `guide_mco` | a question on the clinical situation | the 3 closest passages of the MCO guide 2026 (BM25) | b. which coding rule applies |
+| `chercher_cim10` | a medical term | up to 10 codes found by label, inclusion note or synonym, each with its PMSI status (allowed as DP or not) | c. find candidate codes |
+| `fiche_code` | a code or a category | label, PMSI status, inclusions, **exclusions**, coding notes, parent and more precise codes | d. read the exclusions; f. check the final code |
+| `comparer_codes` | a category (3 characters) | all the leaf codes of the category side by side, with their inclusions and exclusions | e. choose the 4th / 5th character |
+
+**A turn.** At each turn the model writes one message:
+
+```
+system: role, DP / DR definitions, tools, procedure      user: record of the stay
+  │
+  ├─ turn 1..12: assistant message
+  │     ├─ with tool calls (1 to 3) ──► the harness runs them, appends the results ──► next turn
+  │     └─ without tool call = final answer (JSON) ──► checks
+  │                                                     ├─ OK ──► done
+  │                                                     └─ refused ──► correction request ──► next turn
+  └─ after 12 turns, or when the next turn would not fit in the context:
+        « Plus d'appel d'outil : donne maintenant ta réponse JSON. » ──► one last answer, no tools
+```
+
+Stays are processed together in batches (vLLM): every unfinished conversation advances by one turn at a time.
+
+**The checks** on an answer, in this order, each refusal being sent back to the model as a user message:
+
+| Check | If it fails |
+|---|---|
+| the answer is the JSON object | asked again for the JSON |
+| the DP and the DR exist in the ICD-10 (ATIH) | asked for an existing leaf code |
+| the DP is allowed as DP, the DR as DR (PMSI status) | asked for a more precise or another code |
+| the 4 tools of the procedure were all called | reminded to call the missing ones (steps b to f), up to 4 times |
+| the final code (DR, else DP) was read with `fiche_code` | asked to check it and compare it with the other candidates |
+
+The procedure reminder can be sent 4 times; the other refusals share a budget of 2 retries per stay.
+When the retries are used up, the last answer is kept as it is (if its DP is a valid code). A DR given with
+a DP that is not a Z code is dropped without asking. A message cut at 3 072 tokens is generated again
+(this uses the same budget of 2 retries); after that, or when even the final answer no longer fits in
+the context, the stay gets no answer (about 3 % of the AP-HP reviewed stays).
+
+**Generation settings.** Temperature 0.7, top-p 0.8, top-k 20, presence penalty 1.0, Qwen3 *thinking*
+mode off (the model writes its messages and tool calls directly, as in its training conversations). The
+sampling is random: **two runs on the same file do not give exactly the same codes**; compare models on
+the same stays and expect a few points of variation on small test sets.
+
+To see all this on a stay, run `scripts.predict` with `--keep-conv` and read the `conversation` column.
 
 ## Model and training
 
@@ -136,7 +201,7 @@ fine-tune the [encoder](https://github.com/aphp-datascience/partages-cu2-encoder
   ([`resources/procedure.md`](resources/procedure.md)); an answer is refused and the model asked
   again if a mandatory tool was not called, if a code does not exist or is not allowed as DP /
   DR, or if the final code was not checked with `fiche_code`. At most 12 tool turns, then the
-  answer is requested.
+  answer is requested. Details in [How the agent works](#how-the-agent-works).
 
 ## Results (before any fine-tuning on real hospital data)
 
@@ -182,7 +247,6 @@ decoder/acts.py        CCAM procedure line of the input text
 decoder/stays.py       reading the stays file (CSV of the guidelines)
 scripts/predict.py     inference (and accuracy) on a file
 resources/procedure.md coding procedure used when the model ships none (part of the system prompt)
-data/dr_rule.json      keep-the-DR rule per Z code
 data/ccam_2026.csv     CCAM 2026 nomenclature (ATIH)
 ```
 

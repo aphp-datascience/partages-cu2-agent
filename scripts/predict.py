@@ -7,12 +7,11 @@ Input: the stays file of the PARTAGES guidelines (decoder/stays.py): CSV with `i
 `procedure`, `primary_diag` (the last one optional, only used to print the accuracy). The CCAM codes of
 `procedure` are written as the first line of the text, as in training (`--no-acts` to skip).
 Output (CSV, or parquet if --out ends with .parquet): one row per stay with the suggested DP
-(`primary_diag_pred`), `dr`, the `target` (DR if any, else DP), the model's `justification`, the number of
+(`primary_diag_pred`), `dr` (only when the DP is a Z code), the model's `justification`, the number of
 tool calls and, with `--keep-conv`, the whole conversation (to read how the model reached its answer).
 """
 
 import argparse
-import json
 import sys
 import time
 from pathlib import Path
@@ -22,7 +21,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from decoder.acts import load_ccam, with_acts  # noqa: E402
 from decoder.stays import read_stays  # noqa: E402
-from decoder.agent import Settings, run, target  # noqa: E402
+from decoder.agent import Settings, run  # noqa: E402
 from decoder.tools import Ressources  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,8 +35,6 @@ def main() -> None:
     ap.add_argument("--data", required=True, type=Path, help="stays file (CSV or parquet)")
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--no-acts", action="store_true", help="do not add the CCAM line")
-    ap.add_argument("--rule", type=Path, default=ROOT / "data/dr_rule.json",
-                    help="keep-the-DR rule per Z code for `target`; 'none' keeps every DR")
     ap.add_argument("--max-chars", type=int, default=60000, help="characters of the record kept (start)")
     ap.add_argument("--max-turns", type=int, default=12)
     ap.add_argument("--max-model-len", type=int, default=32768)
@@ -74,12 +71,10 @@ def main() -> None:
               tensor_parallel_size=a.gpus, enable_prefix_caching=True, seed=0, disable_cascade_attn=True)
     t0 = time.time()
     res = run(llm, texts, R, Settings(max_turns=a.max_turns, max_model_len=a.max_model_len, procedure=procedure))
-    rule = None if str(a.rule) == "none" else json.loads(a.rule.read_text())
     out = pd.DataFrame({
         "id": df["id"].to_numpy(),
         "primary_diag_pred": [r["dp"] for r in res],
         "dr": [r["dr"] for r in res],
-        "target": [target(r["dp"], r["dr"], rule) for r in res],
         "justification": [r["justification"] for r in res],
         "n_tools": [r["n_tools"] for r in res],
         "forced_answer": [r["forced"] for r in res],

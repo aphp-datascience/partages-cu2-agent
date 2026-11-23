@@ -91,22 +91,6 @@ def parse_answer(text: str) -> tuple[str | None, str | None, str | None]:
     return norm_code(m.group(1)), (norm_code(dr) if dr else None), why
 
 
-def keeps_dr(dp: str, rule: dict) -> bool:
-    """Keep-the-DR rule per Z code (data/dr_rule.json)."""
-    if dp in rule.get("code", {}):
-        return bool(rule["code"][dp])
-    return bool(rule.get("categorie", {}).get(dp[:3], True))
-
-
-def target(dp: str | None, dr: str | None, rule: dict | None = None) -> str | None:
-    """Target code: the DR if any, else the DP; with `rule`, the DR of a Z code that usually has none is dropped."""
-    if dp is None:
-        return None
-    if dr and rule is not None and dp.startswith("Z") and not keeps_dr(dp, rule):
-        return dp
-    return dr or dp
-
-
 @dataclass
 class Settings:
     max_turns: int = 12
