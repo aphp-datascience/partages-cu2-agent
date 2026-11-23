@@ -219,17 +219,17 @@ stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 c
 
 | View | Scope | Stays | Exact | 4 char. | 3 char. |
 |---|---|---:|---:|---:|---:|
-| flattened | ICD-10 | 301 | 46.8 % | 48.5 % | 59.8 % |
-| flattened | surgery | 253 | 51.8 % | 53.4 % | 64.0 % |
-| agreement + single | ICD-10 | 190 | 50.0 % | 52.1 % | 63.2 % |
-| agreement + single | surgery | 163 | 54.0 % | 55.8 % | 66.3 % |
+| flattened | ICD-10 | 310 | 45.5 % | 47.1 % | 58.1 % |
+| flattened | surgery | 259 | 50.6 % | 52.1 % | 62.5 % |
+| agreement + single | ICD-10 | 195 | 48.7 % | 50.8 % | 61.5 % |
+| agreement + single | surgery | 167 | 52.7 % | 54.5 % | 64.7 % |
 | agreement | ICD-10 | 47 | 59.6 % | 59.6 % | 66.0 % |
 | agreement | surgery | 42 | 64.3 % | 64.3 % | 66.7 % |
 
-A few stays (about 3 %) get no answer within the limits of the agent; the table leaves them out
-(301 of the 310 flattened stays answered). Counting them as errors, on the same 310 stays as the
-encoder, the agent finds the exact DP in 45.5 % of the stays vs 41.0 % for the encoder, mostly when
-the DP is a Z code (sessions, follow-up…): 44.7 % vs 32.9 % (76 stays). Small sets: 95 % confidence
+A stay without answer within the limits of the agent (9 of the 310 flattened stays) counts as an
+error. On the same stays, the agent finds the exact DP more often than the encoder (45.5 % vs
+41.0 %, flattened), mostly when the DP is a Z code (sessions, follow-up…): 44.7 % vs 32.9 % (76
+stays). Small sets: 95 % confidence
 interval about ±7 points on ~200 stays, ±13 points on ~50; the reference coding is not certain
 either.
 
