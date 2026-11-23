@@ -9,8 +9,7 @@ It was developed in the PARTAGES project (use case 2, coding assistance for medi
 departments, DIM), next to the
 [encoder](https://github.com/aphp-datascience/partages-cu2-encoder), a lighter classifier.
 The model is released on the Hugging Face Hub:
-**[`PARTAGES-CU2/cu2-icd10-dp-agent`](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-agent)**
-(current version `v0.1`, a pre-release to test the agent; a final version will follow).
+**[`PARTAGES-CU2/cu2-icd10-dp-agent`](https://huggingface.co/PARTAGES-CU2/cu2-icd10-dp-agent)**.
 
 **Terms used below**
 
@@ -30,13 +29,18 @@ The model is released on the Hugging Face Hub:
 - **Encoder or agent?** The [encoder](https://github.com/aphp-datascience/partages-cu2-encoder)
   is faster and gives a ranked list of candidates; the agent is slower (several tool calls per
   stay) but explains its choice. On physician-reviewed AP-HP stays the agent finds the exact DP
-  more often (46.8 % vs 41.0 %), mostly for Z codes (sessions, follow-up); the encoder's top-20
-  contains the DP in 71 % of the stays, and only the encoder can be fine-tuned on your stays.
-- **Hardware:** one GPU with ≥ 40 GB of memory recommended (A100, H100, L40S; tested on an A100
-  80 GB): the weights take 16 GB and a long stay needs a 32 000-token context.
-- **Speed:** on one A100, about 1 200 stays per hour, measured on 200 stays of ~550 words
-  processed together (7-8 tool calls per stay); the throughput is lower with fewer stays at a
-  time. The encoder processes the same stays about 400 times faster.
+  more often (45.5 % vs 41.0 %, same stays), mostly for Z codes (sessions, follow-up); the
+  encoder's top-20 contains the DP in 71 % of the stays, and only the encoder can be fine-tuned
+  on your stays.
+- **Hardware:** one GPU with ≥ 24 GB of memory. With ≥ 40 GB (A100, H100, L40S, A6000) the
+  model runs as is (weights 16 GB, contexts up to 32 000 tokens). On a 24 GB GPU (L4, A10,
+  RTX 4090), load it in FP8 (`--quantization fp8`, weights 8.5 GB): tested by limiting an A100 to
+  24 GB, it gave no measurable loss on the reviewed AP-HP stays (DP within ±4.5 points, no more
+  stays without answer) and was about 12 % slower.
+- **Speed:** on one A100, about 1 200 stays per hour on 200 synthetic stays of ~550 words, and
+  about 420 per hour on 339 real AP-HP stays (longer reports, ~11 tool calls per stay), all
+  stays processed together; fewer stays at a time are slower. The encoder processes the same
+  synthetic stays about 400 times faster.
 
 ## 1. Installation
 
@@ -93,6 +97,7 @@ uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --resources r
 | `--keep-conv` | also write the whole conversation (searches, tool results, answer) of each stay |
 | `--procedure` | coding procedure of the system prompt; by default the `procedure.md` shipped with the model, i.e. the one it was trained with (keep it) |
 | `--gpus` | number of GPUs (tensor parallelism) |
+| `--quantization fp8` | load the weights in FP8, for a GPU with 24 GB of memory (see Hardware above) |
 | `--max-turns` | tool turns before the answer is requested (default 12, as in training) |
 | `--max-model-len` | context length in tokens (default 32 768) |
 | `--max-chars` | characters of the record kept, from the start (default 60 000) |
@@ -187,7 +192,7 @@ To see all this on a stay, run `scripts.predict` with `--keep-conv` and read the
 
 - **Base model:** [`Qwen/Qwen3-8B`](https://huggingface.co/Qwen/Qwen3-8B) (Apache-2.0), fine-tuned
   with LoRA (rank 32) on agent conversations, the adapter being merged into the weights.
-- **Training conversations** (version `v0.1`): about 27 600 tool-using conversations of a larger
+- **Training conversations:** about 27 600 tool-using conversations of a larger
   model, **Mistral Large 4**, coding stays with the same tools and procedure, no real patient data:
   6 385 on [PARHAF](https://huggingface.co/datasets/HealthDataHub/PARHAF) fictitious patients and
   their rewrites, 784 on PARHAF patients with a reference coding (only conversations reaching it),
@@ -224,10 +229,12 @@ stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 c
 | agreement | ICD-10 | 47 | 59.6 % | 59.6 % | 66.0 % |
 | agreement | surgery | 42 | 64.3 % | 64.3 % | 66.7 % |
 
-The agent is better than the encoder on these stays (flattened: 46.8 % vs 41.0 % exact), mostly
-when the DP is a Z code (sessions, follow-up…): 47 % vs 33 % exact. Small sets: 95 % confidence
+A few stays (about 3 %) get no answer within the limits of the agent; the table leaves them out
+(301 of the 310 flattened stays answered). Counting them as errors, on the same 310 stays as the
+encoder, the agent finds the exact DP in 45.5 % of the stays vs 41.0 % for the encoder, mostly when
+the DP is a Z code (sessions, follow-up…): 44.7 % vs 32.9 % (76 stays). Small sets: 95 % confidence
 interval about ±7 points on ~200 stays, ±13 points on ~50; the reference coding is not certain
-either. A few stays (about 3 %) get no answer within the limits of the agent and are not counted.
+either.
 
 ## Limitations
 

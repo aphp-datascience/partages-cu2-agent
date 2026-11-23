@@ -39,6 +39,8 @@ def main() -> None:
     ap.add_argument("--max-turns", type=int, default=12)
     ap.add_argument("--max-model-len", type=int, default=32768)
     ap.add_argument("--gpus", type=int, default=1, help="tensor parallel GPUs")
+    ap.add_argument("--quantization", choices=["fp8"],
+                    help="load the weights in FP8 (about 8.5 GB instead of 16 GB), for GPUs with 24 GB of memory")
     ap.add_argument("--procedure", type=Path,
                     help="coding procedure of the system prompt; default: procedure.md shipped with the model (the "
                          "one it was trained with), else resources/procedure.md")
@@ -68,7 +70,8 @@ def main() -> None:
     # cascade attention off: with small batches sharing the long system prompt, vLLM 0.10 produced degenerate
     # outputs (repetitions, no answer for ~60 % of 30 stays; 0 % without it)
     llm = LLM(model=str(model), max_model_len=a.max_model_len, gpu_memory_utilization=0.9,
-              tensor_parallel_size=a.gpus, enable_prefix_caching=True, seed=0, disable_cascade_attn=True)
+              tensor_parallel_size=a.gpus, enable_prefix_caching=True, seed=0, disable_cascade_attn=True,
+              quantization=a.quantization)
     t0 = time.time()
     res = run(llm, texts, R, Settings(max_turns=a.max_turns, max_model_len=a.max_model_len, procedure=procedure))
     out = pd.DataFrame({

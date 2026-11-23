@@ -40,12 +40,15 @@ departments, DIM), next to the encoder
   leaves your infrastructure. Trained without any real patient data.
 - **Needs its harness:** the model only works with the tools, prompts and answer checks of the
   repository below (it was trained with them).
-- **Hardware:** one GPU with ≥ 40 GB of memory recommended (A100, H100, L40S; tested on an A100
-  80 GB): the weights take 16 GB and a long stay needs a 32 000-token context.
-- **Speed:** on one A100, about 1 200 stays per hour, measured on 200 stays of ~550 words
-  processed together (7-8 tool calls per stay); the throughput is lower with fewer stays at a
-  time. The encoder processes the same stays about 400 times faster.
-- **Version `v0.1`** (pre-release, to test the agent on your stays); `v0` is the previous one.
+- **Hardware:** one GPU with ≥ 24 GB of memory. With ≥ 40 GB (A100, H100, L40S, A6000) the
+  model runs as is (weights 16 GB, contexts up to 32 000 tokens). On a 24 GB GPU (L4, A10,
+  RTX 4090), load it in FP8 (`--quantization fp8`, weights 8.5 GB): tested by limiting an A100 to
+  24 GB, it gave no measurable loss on the reviewed AP-HP stays (DP within ±4.5 points, no more
+  stays without answer) and was about 12 % slower.
+- **Speed:** on one A100, about 1 200 stays per hour on 200 synthetic stays of ~550 words, and
+  about 420 per hour on 339 real AP-HP stays (longer reports, ~11 tool calls per stay), all
+  stays processed together; fewer stays at a time are slower. The encoder processes the same
+  synthetic stays about 400 times faster.
 
 **Everything to run and evaluate it on your stays:**
 <https://github.com/aphp-datascience/partages-cu2-decoder>.
@@ -105,10 +108,12 @@ stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 c
 | agreement | ICD-10 | 47 | 59.6 % | 59.6 % | 66.0 % |
 | agreement | surgery | 42 | 64.3 % | 64.3 % | 66.7 % |
 
-The agent is better than the encoder on these stays (flattened: 46.8 % vs 41.0 % exact), mostly
-when the DP is a Z code (sessions, follow-up…): 47 % vs 33 % exact. Small sets: 95 % confidence
+A few stays (about 3 %) get no answer within the limits of the agent; the table leaves them out
+(301 of the 310 flattened stays answered). Counting them as errors, on the same 310 stays as the
+encoder, the agent finds the exact DP in 45.5 % of the stays vs 41.0 % for the encoder, mostly when
+the DP is a Z code (sessions, follow-up…): 44.7 % vs 32.9 % (76 stays). Small sets: 95 % confidence
 interval about ±7 points on ~200 stays, ±13 points on ~50; the reference coding is not certain
-either. A few stays (about 3 %) get no answer within the limits of the agent and are not counted.
+either.
 
 ## Limitations
 
