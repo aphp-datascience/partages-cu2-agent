@@ -140,10 +140,16 @@ Accuracy of the suggested **DP** against the PMSI DP of the stay, i.e. what `pri
 contains: exact code, first 4 characters (the metric of the PARTAGES Codabench challenge), and
 3-character category.
 
-**Physician-reviewed AP-HP stays** (May 2026; text = acts + CRC + CRH + CR-OP). Views: **flattened** =
-every review is a row; **agreement + single** = one row per stay, reviewed once or by several
-reviewers who agree; **agreement** = only stays with several agreeing reviewers. **ICD-10** = all
-stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 codes).
+**Physician-reviewed AP-HP stays** (May 2026, text = acts + CRC + CRH + CR-OP).
+
+Views:
+
+- **flattened**: every review is a row.
+- **agreement + single**: one row per stay, reviewed once or by several reviewers who agree.
+- **agreement**: only stays with several agreeing reviewers.
+
+Scope: **ICD-10** = all stays, **surgery** = stays coded in the surgical scope of the use case
+(~3 500 codes).
 
 | View | Scope | Stays | Exact | 4 char. | 3 char. |
 |---|---|---:|---:|---:|---:|
@@ -154,12 +160,14 @@ stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 c
 | agreement | ICD-10 | 47 | 59.6 % | 59.6 % | 66.0 % |
 | agreement | surgery | 42 | 64.3 % | 64.3 % | 66.7 % |
 
-A stay without answer within the limits of the agent (9 of the 310 flattened stays) counts as an
-error. When the DP is a Z code (sessions, follow-up…), the agent finds it about as often as other
-DPs: 44.7 % exact (76 stays, flattened). Small sets: 95 % confidence
-interval about ±7 points on ~200 stays, ±13 points on ~50. The reference coding is not certain
-either: even reviewed PMSI coding contains errors, and some stays can legitimately be coded in
-more than one way. The **agreement** view, where reviewers concur, is the most reliable.
+- **No answer = error:** a stay without answer within the limits of the agent (9 of the 310
+  flattened stays) counts as an error.
+- **Z codes:** when the DP is a Z code (sessions, follow-up…), the agent finds it about as often as
+  other DPs: 44.7 % exact (76 stays, flattened).
+- **Small sets:** 95 % confidence interval about ±7 points on ~200 stays, ±13 points on ~50.
+- **The reference coding is not certain either:** even reviewed PMSI coding contains errors, and
+  some stays can legitimately be coded in more than one way. The **agreement** view, where
+  reviewers concur, is the most reliable.
 
 ## Limitations
 
