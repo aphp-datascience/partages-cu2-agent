@@ -42,29 +42,27 @@ cd partages-cu2-decoder
 uv sync
 ```
 
-**Model and resources.** The Hub repositories are private for now: ask the CU2 team for access,
-log in, then download the model and the offline resources of the tools (ICD-10 index, MCO guide
-passages, ICD-10 synonyms) once:
+**Model.** The Hub repository is private for now: ask the CU2 team for access, log in, then
+download the model once. It ships the offline resources of the tools too (ICD-10 index, MCO guide
+passages, ICD-10 synonyms):
 
 ```bash
-uv run huggingface-cli login
-uv run huggingface-cli download PARTAGES-CU2/cu2-icd10-dp-agent --local-dir models/cu2-icd10-dp-agent
-uv run huggingface-cli download PARTAGES-CU2/cu2-agent-resources --repo-type dataset \
-    --local-dir resources/data
+uv run hf auth login
+uv run hf download PARTAGES-CU2/cu2-icd10-dp-agent --local-dir models/cu2-icd10-dp-agent
 ```
 
-On a server without internet access, download on another machine and copy both folders over.
+On a server without internet access, download on another machine and copy the model folder over.
 
 ## 2. Input data
 
-One **CSV file, one row per hospital stay (RUM)**, with the
-columns of the PARTAGES guidelines (the format of the PARTAGES Codabench challenge):
+One **CSV file, one row per hospital stay (RUM)**, with the columns of the PARTAGES guidelines
+(the format of the PARTAGES Codabench challenge):
 
 | Column | Needed for | Content | Example |
 |---|---|---|---|
 | `id` | always | a unique id of the stay | `RUM_000123` |
 | `speciality` | — | the specialty of the stay (not used by the model) | `CHIRURGIE VISCERALE` |
-| `text` | always | the reports of the stay (CRC, CR-OP, CRH) concatenated, separated by a blank line or by the `[...]` marker of the guidelines | `Compte rendu de consultation …` |
+| `text` | always | the reports of the stay (CRC, CRH, CR-OP) concatenated, separated by a blank line or by the `[...]` marker of the guidelines | `Compte rendu de consultation …` |
 | `procedure` | strongly recommended | the CCAM codes of the stay, separated by spaces; empty if none | `NDPA014 NDPA008` |
 | `primary_diag` | evaluation | the PMSI principal diagnosis (DP) of the RUM, as coded, Z codes included | `M6534`, `Z511` |
 
@@ -76,13 +74,12 @@ raw accuracy must not be read as a ranking of hospitals, whose coding practices 
 ## 3. Running and evaluating the agent
 
 ```bash
-uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --resources resources/data \
-    --data my_test.csv --out preds.csv
+uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --data my_test.csv --out preds.csv
 ```
 
 | Option | What it does |
 |---|---|
-| `--model`, `--resources` | the downloaded model and resources folders |
+| `--model` | the downloaded model folder (its `resources/` folder holds the tool resources) |
 | `--data`, `--out` | your stays file, and the file where predictions are written (CSV, or parquet if the name ends with `.parquet`) |
 | `--no-acts` | do not write the CCAM line (by default it is built from `procedure`, as in training) |
 | `--keep-conv` | also write the whole conversation (searches, tool results, answer) of each stay |
@@ -219,9 +216,8 @@ stays; **surgery** = stays coded in the surgical scope of the use case (~3 500 c
 
 A stay without answer within the limits of the agent (9 of the 310 flattened stays) counts as an
 error. When the DP is a Z code (sessions, follow-up…), the agent finds it about as often as other
-DPs: 44.7 % exact (76 stays, flattened). Small sets: 95 % confidence
-interval about ±7 points on ~200 stays, ±13 points on ~50; the reference coding is not certain
-either.
+DPs: 44.7 % exact (76 stays, flattened). Small sets: 95 % confidence interval about ±7 points on
+~200 stays, ±13 points on ~50. The reference coding is not certain either.
 
 ## Limitations
 

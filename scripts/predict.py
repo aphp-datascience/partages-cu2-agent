@@ -1,7 +1,6 @@
 """Run the coding agent on a stays file (one row per stay / RUM).
 
-    uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --resources resources/data \
-        --data my_test.csv --out preds.csv
+    uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --data my_test.csv --out preds.csv
 
 Input: the stays file of the PARTAGES guidelines (decoder/stays.py): CSV with `id`, `speciality`, `text`,
 `procedure`, `primary_diag` (the last one optional, only used to print the accuracy). The CCAM codes of
@@ -30,8 +29,8 @@ ROOT = Path(__file__).resolve().parent.parent
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--model", required=True, help="local dir or Hugging Face repo id of the model")
-    ap.add_argument("--resources", type=Path, default=ROOT / "resources/data",
-                    help="folder of the downloaded resources (index/, syn_all.parquet)")
+    ap.add_argument("--resources", type=Path,
+                    help="folder of the tool resources (index/, syn_all.parquet); default: resources/ of the model")
     ap.add_argument("--data", required=True, type=Path, help="stays file (CSV or parquet)")
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--no-acts", action="store_true", help="do not add the CCAM line")
@@ -64,7 +63,8 @@ def main() -> None:
         model = Path(snapshot_download(repo, revision=rev or None))
     procedure = a.procedure or (model / "procedure.md" if (model / "procedure.md").exists() else ROOT / "resources/procedure.md")
     print(f"model {model} ; procedure {procedure}", flush=True)
-    R = Ressources(a.resources / "index", a.resources / "syn_all.parquet")
+    res = a.resources or model / "resources"
+    R = Ressources(res / "index", res / "syn_all.parquet")
     from vllm import LLM
 
     # cascade attention off: with small batches sharing the long system prompt, vLLM 0.10 produced degenerate

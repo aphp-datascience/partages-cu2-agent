@@ -1,6 +1,6 @@
 """Offline tools of the coding agent. Everything is read from local files (no network): the ICD-10
 FR index and the passages of the ATIH MCO methodological guide (`index/`), plus the ICD-10 labels and
-synonyms used by the search. They are downloaded once with the resources (see the README).
+synonyms used by the search. They are shipped with the model, in its `resources/` folder.
 
 Tools exposed to the model (OpenAI function schema in TOOLS):
   chercher_cim10(texte)   BM25 over labels, inclusion notes and synonyms -> best codes

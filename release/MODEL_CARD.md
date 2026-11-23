@@ -54,10 +54,8 @@ departments, DIM).
 
 ```bash
 git clone https://github.com/aphp-datascience/partages-cu2-decoder.git && cd partages-cu2-decoder && uv sync
-uv run huggingface-cli download PARTAGES-CU2/cu2-icd10-dp-agent --local-dir models/cu2-icd10-dp-agent
-uv run huggingface-cli download PARTAGES-CU2/cu2-agent-resources --repo-type dataset --local-dir resources/data
-uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --resources resources/data \
-    --data my_stays.csv --out preds.csv
+uv run hf download PARTAGES-CU2/cu2-icd10-dp-agent --local-dir models/cu2-icd10-dp-agent
+uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --data my_stays.csv --out preds.csv
 ```
 
 Output per stay: the suggested DP (`primary_diag_pred`), the DR (`dr`, only when the DP is a Z
@@ -67,15 +65,14 @@ results, answer).
 ## Input data
 
 One CSV file, one row per hospital stay (RUM), with the columns of the PARTAGES guidelines (the
-same format as the PARTAGES Codabench challenge). The
-repository turns it into the text the model reads: the CCAM procedures on the first line
-(`Actes (CCAM) : CODE - label ; …`), then the reports.
+same format as the PARTAGES Codabench challenge). The repository turns it into the text the model
+reads: the CCAM procedures on the first line (`Actes (CCAM) : CODE - label ; …`), then the reports.
 
 | Column | Needed for | Content | Example |
 |---|---|---|---|
 | `id` | always | a unique id of the stay | `RUM_000123` |
 | `speciality` | — | the specialty of the stay (not used by the model) | `CHIRURGIE VISCERALE` |
-| `text` | always | the reports of the stay (CRC, CR-OP, CRH) concatenated | `Compte rendu de consultation …` |
+| `text` | always | the reports of the stay (CRC, CRH, CR-OP) concatenated | `Compte rendu de consultation …` |
 | `procedure` | strongly recommended | the CCAM codes of the stay, separated by spaces | `NDPA014 NDPA008` |
 | `primary_diag` | evaluation | the PMSI DP of the RUM, as coded (Z codes included) | `M6534`, `Z511` |
 
