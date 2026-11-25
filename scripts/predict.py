@@ -43,9 +43,9 @@ def main() -> None:
     ap.add_argument("--procedure", type=Path,
                     help="coding procedure of the system prompt; default: procedure.md shipped with the model (the "
                          "one it was trained with), else resources/procedure.md")
-    ap.add_argument("--loop", choices=["lockstep", "per-stay"], default="lockstep",
-                    help="lockstep: every stay waits for the others at each turn; per-stay: each stay goes on "
-                         "as soon as its message is generated (faster, same agent)")
+    ap.add_argument("--loop", choices=["per-stay", "lockstep"], default="per-stay",
+                    help="per-stay: each stay goes on as soon as its message is generated; lockstep: every stay waits "
+                         "for the others at each turn (slower, same agent)")
     ap.add_argument("--max-active", type=int, help="per-stay loop: conversations in flight at most (default: all)")
     ap.add_argument("--keep-conv", action="store_true", help="also write the whole conversation")
     a = ap.parse_args()

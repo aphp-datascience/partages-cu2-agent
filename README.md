@@ -91,7 +91,7 @@ uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --data my_tes
 | `--max-turns` | tool turns before the answer is requested (default 12, as in training) |
 | `--max-model-len` | context length in tokens (default 32 768) |
 | `--max-chars` | characters of the record kept, from the start (default 60 000) |
-| `--loop per-stay` | each stay goes on to its next turn as soon as its message is generated, instead of waiting for the other stays at every turn (default `lockstep`). Same agent and checks, about 15 % faster on one A100 |
+| `--loop lockstep` | every stay waits for the others at each turn. By default (`per-stay`) each stay goes on to its next turn as soon as its message is generated: same agent and checks, about 15 % faster on one A100 |
 
 `preds.csv` has one row per stay:
 
