@@ -2,7 +2,7 @@
 
     uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --data my_test.csv --out preds.csv
 
-Input: the stays file of the PARTAGES guidelines (decoder/stays.py): CSV with `id`, `speciality`, `text`,
+Input: the stays file of the PARTAGES guidelines (agent/stays.py): CSV with `id`, `speciality`, `text`,
 `procedure`, `primary_diag` (the last one optional, only used to print the accuracy). The CCAM codes of
 `procedure` are written as the first line of the text, as in training (`--no-acts` to skip).
 Output (CSV, or parquet if --out ends with .parquet): one row per stay with the suggested DP
@@ -18,10 +18,10 @@ from pathlib import Path
 import pandas as pd
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from decoder.acts import load_ccam, with_acts  # noqa: E402
-from decoder.stays import read_stays  # noqa: E402
-from decoder.agent import Settings, run  # noqa: E402
-from decoder.tools import Ressources  # noqa: E402
+from agent.acts import load_ccam, with_acts  # noqa: E402
+from agent.stays import read_stays  # noqa: E402
+from agent.agent import Settings, run  # noqa: E402
+from agent.tools import Ressources  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 

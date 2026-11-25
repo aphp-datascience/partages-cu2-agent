@@ -29,6 +29,8 @@ departments, DIM). The model is released on the Hugging Face Hub:
 - **Speed:** on one A100, about 1 200 stays per hour on 200 synthetic stays of ~550 words, and
   about 420 per hour on 339 real AP-HP stays (longer reports, ~11 tool calls per stay), all
   stays processed together; fewer stays at a time are slower.
+- **Faster alternative:** the [CU2 decoder](https://github.com/aphp-datascience/partages-cu2-decoder)
+  codes the DP in a single generation, without tools nor justification, much faster.
 - **Mostly trained on surgical stays**, but covers the whole ICD-10 (see
   [Limitations](#limitations)).
 
@@ -39,8 +41,8 @@ Python 3.12 and [uv](https://docs.astral.sh/uv/); Linux x86_64 with an NVIDIA GP
 transformers 5.19.0).
 
 ```bash
-git clone https://github.com/aphp-datascience/partages-cu2-decoder.git
-cd partages-cu2-decoder
+git clone https://github.com/aphp-datascience/partages-cu2-agent.git
+cd partages-cu2-agent
 uv sync
 ```
 
@@ -110,7 +112,7 @@ DP equals it: exact code, first 4 characters (the Codabench metric) and first 3 
 
 ### How the agent works
 
-The agent is a conversation between the model and a fixed harness (`decoder/agent.py`). The model was
+The agent is a conversation between the model and a fixed harness (`agent/agent.py`). The model was
 trained on conversations produced by exactly this harness, so **keep the prompts, the procedure and the
 checks as they are**: change them only if you fine-tune the model again.
 
@@ -251,10 +253,10 @@ Scope: **ICD-10** = all stays, **surgery** = stays coded in the surgical scope o
 ## Repository layout
 
 ```
-decoder/agent.py       the agent: prompts, conversation loop, answer checks
-decoder/tools.py       the four offline tools
-decoder/acts.py        CCAM procedure line of the input text
-decoder/stays.py       reading the stays file (CSV of the guidelines)
+agent/agent.py       the agent: prompts, conversation loop, answer checks
+agent/tools.py       the four offline tools
+agent/acts.py        CCAM procedure line of the input text
+agent/stays.py       reading the stays file (CSV of the guidelines)
 scripts/predict.py     inference (and accuracy) on a file
 resources/procedure.md coding procedure used when the model ships none (part of the system prompt)
 data/ccam_2026.csv     CCAM 2026 nomenclature (ATIH)

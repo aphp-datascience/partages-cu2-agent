@@ -45,15 +45,17 @@ departments, DIM).
 - **Speed:** on one A100, about 1 200 stays per hour on 200 synthetic stays of ~550 words, and
   about 420 per hour on 339 real AP-HP stays (longer reports, ~11 tool calls per stay), all
   stays processed together; fewer stays at a time are slower.
+- **Faster alternative:** the [CU2 decoder](https://github.com/aphp-datascience/partages-cu2-decoder)
+  codes the DP in a single generation, without tools nor justification, much faster.
 - **Mostly trained on surgical stays**, but covers the whole ICD-10 (see Limitations).
 
 **Everything to run and evaluate it on your stays:**
-<https://github.com/aphp-datascience/partages-cu2-decoder>.
+<https://github.com/aphp-datascience/partages-cu2-agent>.
 
 ## Quick use
 
 ```bash
-git clone https://github.com/aphp-datascience/partages-cu2-decoder.git && cd partages-cu2-decoder && uv sync
+git clone https://github.com/aphp-datascience/partages-cu2-agent.git && cd partages-cu2-agent && uv sync
 uv run hf download PARTAGES-CU2/cu2-icd10-dp-agent --local-dir models/cu2-icd10-dp-agent
 uv run python -m scripts.predict --model models/cu2-icd10-dp-agent --data my_stays.csv --out preds.csv
 ```
@@ -83,7 +85,7 @@ characters).
 
 ### How the agent works
 
-The model converses with a fixed harness (the repository's `decoder/agent.py`). The *system
+The model converses with a fixed harness (the repository's `agent/agent.py`). The *system
 prompt* asks it to code the stay as a DIM physician would, following the ATIH MCO guide, defines
 the DP and the DR, and ends with the mandatory coding procedure (`procedure.md` in this
 repository); the *user message* is the record of the stay. At each turn the model either calls

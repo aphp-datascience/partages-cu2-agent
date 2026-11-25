@@ -1,5 +1,5 @@
 [project]
-name = "partages-cu2-decoder"
+name = "partages-cu2-agent"
 version = "0.1.0"
 description = "PARTAGES CU2: LLM agent for French ICD-10 (PMSI) coding of hospital stays"
 readme = "README.md"
