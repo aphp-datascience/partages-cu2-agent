@@ -29,8 +29,6 @@ departments, DIM). The model is released on the Hugging Face Hub:
 - **Speed:** on one A100, about 1 200 stays per hour on 200 synthetic stays of ~550 words, and
   about 420 per hour on 339 real AP-HP stays (longer reports, ~11 tool calls per stay), all
   stays processed together; fewer stays at a time are slower.
-- **Faster alternative:** the [CU2 decoder](https://github.com/aphp-datascience/partages-cu2-decoder)
-  codes the DP in a single generation, without tools nor justification, much faster.
 - **Mostly trained on surgical stays**, but covers the whole ICD-10 (see
   [Limitations](#limitations)).
 
