@@ -122,31 +122,45 @@ def check(R: Ressources, dp: str | None, dr: str | None) -> tuple[str | None, st
     return None, dr
 
 
-def run(llm, texts: list[str], R: Ressources, s: Settings = Settings(), log=print) -> list[dict]:
-    """Code every text; returns one dict per text: dp, dr, justification, n_tools, forced, conv (the full
-    conversation, JSON)."""
-    from vllm import SamplingParams
+class _Machine:
+    """The state of every conversation and the handling of one generated message (shared by both loops)."""
 
-    sp = SamplingParams(temperature=s.temperature, top_p=s.top_p, top_k=20, presence_penalty=s.presence_penalty,
-                        max_tokens=s.max_tokens)
-    tools = [TOOLS[x] for x in TOOL_NAMES]
-    tok = llm.get_tokenizer()
-    budget = s.max_model_len - s.max_tokens
-    sysmsg = system_prompt(s.max_turns, s.procedure)
-    n = len(texts)
-    convs = [[{"role": "system", "content": sysmsg}, {"role": "user", "content": user_message(t)}] for t in texts]
-    out = [dict(dp=None, dr=None, justification=None, n_tools=0, forced=False) for _ in texts]
-    calls = [[] for _ in texts]  # (tool, args) already called
-    finished, forced = [False] * n, [False] * n
-    n_retry, n_force = [0] * n, [0] * n
+    def __init__(self, llm, texts: list[str], R: Ressources, s: Settings):
+        from vllm import SamplingParams
 
-    def length(conv: list[dict], with_tools: bool) -> int:
-        text = tok.apply_chat_template(copy.deepcopy(conv), tools=tools if with_tools else None,
-                                       add_generation_prompt=True, tokenize=False, enable_thinking=False)
-        return len(tok.encode(text, add_special_tokens=False))
+        self.sp = SamplingParams(temperature=s.temperature, top_p=s.top_p, top_k=20,
+                                 presence_penalty=s.presence_penalty, max_tokens=s.max_tokens)
+        self.tools = [TOOLS[x] for x in TOOL_NAMES]
+        self.tok = llm.get_tokenizer()
+        self.R, self.s = R, s
+        self.budget = s.max_model_len - s.max_tokens
+        sysmsg = system_prompt(s.max_turns, s.procedure)
+        n = len(texts)
+        self.convs = [[{"role": "system", "content": sysmsg}, {"role": "user", "content": user_message(t)}]
+                      for t in texts]
+        self.out = [dict(dp=None, dr=None, justification=None, n_tools=0, forced=False) for _ in texts]
+        self.calls = [[] for _ in texts]  # (tool, args) already called
+        self.finished, self.forced = [False] * n, [False] * n
+        self.n_retry, self.n_force = [0] * n, [0] * n
 
-    def step(i: int, gen, last: bool) -> int:
+    def length(self, conv: list[dict], with_tools: bool) -> int:
+        text = self.tok.apply_chat_template(copy.deepcopy(conv), tools=self.tools if with_tools else None,
+                                            add_generation_prompt=True, tokenize=False, enable_thinking=False)
+        return len(self.tok.encode(text, add_special_tokens=False))
+
+    def prepare(self, i: int, turn: int) -> None:
+        """Before a turn: max turns reached, or the next turn would not fit: ask for the answer, no tools."""
+        s, conv = self.s, self.convs[i]
+        if not self.forced[i] and (turn >= s.max_turns or self.length(conv, True) > self.budget):
+            self.forced[i] = self.out[i]["forced"] = True
+            conv.append({"role": "user", "content": FORCE})
+        if self.forced[i] and self.length(conv, False) > self.budget:  # not even room for the answer
+            self.finished[i] = True
+
+    def step(self, i: int, gen, last: bool) -> int:
         """Handle one generated message of conversation i; returns the number of tools called."""
+        R, convs, out, calls = self.R, self.convs, self.out, self.calls
+        n_retry, n_force, finished = self.n_retry, self.n_force, self.finished
         text = gen.text
         visible = THINK.sub("", text).strip()
         if gen.finish_reason == "length" and not last:  # cut by max_tokens: retry the turn, nothing kept
@@ -192,28 +206,92 @@ def run(llm, texts: list[str], R: Ressources, s: Settings = Settings(), log=prin
             convs[i].append({"role": "user", "content": why})
         return 0
 
+    def result(self) -> list[dict]:
+        for o, c in zip(self.out, self.convs):
+            o["conv"] = json.dumps(c, ensure_ascii=False)
+        return self.out
+
+
+def run(llm, texts: list[str], R: Ressources, s: Settings = Settings(), log=print) -> list[dict]:
+    """Code every text, all conversations in lockstep turns; returns one dict per text: dp, dr, justification,
+    n_tools, forced, conv (the full conversation, JSON)."""
+    m = _Machine(llm, texts, R, s)
+    n = len(texts)
     for turn in range(s.max_turns + 2):
-        active = [i for i in range(n) if not finished[i]]
+        active = [i for i in range(n) if not m.finished[i]]
         if not active:
             break
-        for i in active:  # max turns reached, or the next turn would not fit: ask for the answer, no tools
-            if not forced[i] and (turn >= s.max_turns or length(convs[i], True) > budget):
-                forced[i] = out[i]["forced"] = True
-                convs[i].append({"role": "user", "content": FORCE})
-            if forced[i] and length(convs[i], False) > budget:  # not even room for the answer
-                finished[i] = True
+        for i in active:
+            m.prepare(i, turn)
         n_calls = 0
         for with_tools in (True, False):
-            group = [i for i in active if not finished[i] and forced[i] != with_tools]
+            group = [i for i in active if not m.finished[i] and m.forced[i] != with_tools]
             if not group:
                 continue
             # copies: vLLM rewrites tool_call arguments (str -> dict) IN PLACE in the messages it gets
-            gens = llm.chat([copy.deepcopy(convs[i]) for i in group], sp, tools=tools if with_tools else None,
+            gens = llm.chat([copy.deepcopy(m.convs[i]) for i in group], m.sp,
+                            tools=m.tools if with_tools else None,
                             chat_template_kwargs={"enable_thinking": False}, use_tqdm=False)
             for i, g in zip(group, gens):
-                n_calls += step(i, g.outputs[0], last=not with_tools)
-        log(f"turn {turn}: {len(active)} active, {n_calls} tool calls, {sum(finished)}/{n} done")
+                n_calls += m.step(i, g.outputs[0], last=not with_tools)
+        log(f"turn {turn}: {len(active)} active, {n_calls} tool calls, {sum(m.finished)}/{n} done")
+    return m.result()
 
-    for o, c in zip(out, convs):
-        o["conv"] = json.dumps(c, ensure_ascii=False)
-    return out
+
+def run_per_stay(llm, texts: list[str], R: Ressources, s: Settings = Settings(), log=print,
+                 max_active: int | None = None) -> list[dict]:
+    """Same agent, same checks, but each conversation advances on its own: as soon as one message is generated,
+    its tools run and its next turn is queued, without waiting for the other stays (the GPU stays full until
+    the end). At most `max_active` conversations in flight (default: all). Same result as `run` in distribution
+    (sampling at temperature > 0), not stay by stay."""
+    m = _Machine(llm, texts, R, s)
+    n = len(texts)
+    engine = llm.llm_engine
+    turn = [0] * n
+    pending: dict[str, int] = {}  # vLLM request id -> conversation
+    todo = list(range(n))[::-1]
+    t_log, done = 0, 0
+
+    def submit(i: int) -> bool:
+        """Queue the next turn of conversation i; False if it is finished."""
+        while not m.finished[i]:
+            if turn[i] >= s.max_turns + 2:  # same cap as the lockstep loop: no answer
+                m.finished[i] = True
+                break
+            m.prepare(i, turn[i])
+            if m.finished[i]:
+                break
+            with_tools = not m.forced[i]
+            ids = llm.enqueue_chat([copy.deepcopy(m.convs[i])], m.sp.clone(),
+                                   tools=m.tools if with_tools else None,
+                                   chat_template_kwargs={"enable_thinking": False}, use_tqdm=False)
+            # vLLM returns its internal id `<id>-<8 random chars>`; outputs carry the external `<id>`
+            pending[ids[0].rsplit("-", 1)[0]] = i
+            return True
+        return False
+
+    def fill() -> None:
+        nonlocal done
+        while todo and (max_active is None or len(pending) < max_active):
+            i = todo.pop()
+            if not submit(i):
+                done += 1
+
+    fill()
+    while pending:
+        if not engine.has_unfinished_requests():
+            raise RuntimeError(f"{len(pending)} conversations wait for outputs the engine will not produce")
+        for o in engine.step():
+            if not o.finished or o.request_id not in pending:
+                continue
+            i = pending.pop(o.request_id)
+            last = m.forced[i]
+            m.step(i, o.outputs[0], last=last)
+            turn[i] += 1
+            if not submit(i):
+                done += 1
+        fill()
+        if done - t_log >= max(1, n // 20) or (not pending and done):
+            t_log = done
+            log(f"{done}/{n} done, {len(pending)} in flight")
+    return m.result()

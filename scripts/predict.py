@@ -20,7 +20,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from agent.acts import load_ccam, with_acts  # noqa: E402
 from agent.stays import read_stays  # noqa: E402
-from agent.agent import Settings, run  # noqa: E402
+from agent.agent import Settings, run, run_per_stay  # noqa: E402
 from agent.tools import Ressources  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -43,6 +43,10 @@ def main() -> None:
     ap.add_argument("--procedure", type=Path,
                     help="coding procedure of the system prompt; default: procedure.md shipped with the model (the "
                          "one it was trained with), else resources/procedure.md")
+    ap.add_argument("--loop", choices=["lockstep", "per-stay"], default="lockstep",
+                    help="lockstep: every stay waits for the others at each turn; per-stay: each stay goes on "
+                         "as soon as its message is generated (faster, same agent)")
+    ap.add_argument("--max-active", type=int, help="per-stay loop: conversations in flight at most (default: all)")
     ap.add_argument("--keep-conv", action="store_true", help="also write the whole conversation")
     a = ap.parse_args()
 
@@ -73,7 +77,11 @@ def main() -> None:
               tensor_parallel_size=a.gpus, enable_prefix_caching=True, seed=0, disable_cascade_attn=True,
               quantization=a.quantization)
     t0 = time.time()
-    res = run(llm, texts, R, Settings(max_turns=a.max_turns, max_model_len=a.max_model_len, procedure=procedure))
+    settings = Settings(max_turns=a.max_turns, max_model_len=a.max_model_len, procedure=procedure)
+    if a.loop == "per-stay":
+        res = run_per_stay(llm, texts, R, settings, max_active=a.max_active)
+    else:
+        res = run(llm, texts, R, settings)
     out = pd.DataFrame({
         "id": df["id"].to_numpy(),
         "primary_diag_pred": [r["dp"] for r in res],
